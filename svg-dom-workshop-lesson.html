@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Making the Most of the SVG DOM</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width">
+    <style media="all">
+        h1, h2, h3, header, footer, p {
+            text-align: center;
+        }    
+        p {
+            font-style: italic;
+        }
+        li {
+            margin-bottom: 0.5em;
+        }
+        li li {
+            margin-bottom: 0.1em;
+        }
+        ul, ol {
+            margin: 0.25em 0;
+        }
+        header li, footer li {
+            display: block;
+        }
+        header li li, footer li li{
+            font-size: inherit;
+            margin: 0.5em auto;
+        }
+        header ul, footer ul {
+            display: block;
+            padding: 0;
+        }
+        footer, section {
+            position: relative;
+            counter-increment: slide;
+        }
+        footer::before, section::before {
+            content: counter(slide);
+            
+            display: block;
+            position: absolute;
+            top: 0;
+            right: 0;
+            padding: 0.5em;
+            height: 1em;
+            width: 1em;
+            color: gray;
+        }
+    </style>
+    <style media="print">
+        header, section, footer {
+            border-bottom: double dimgray 5px;
+            padding: 1em 0;
+            break-inside: avoid;
+        }
+        a:link, a:visited {
+           color: inherit;
+           text-decoration: none;
+        }
+        a:link::after {
+            content: " (" attr(href) ")";
+        }
+        a.literal::after {
+            content: normal;
+        }
+    </style>
+    <style media="screen">
+        body {
+            background-color: #666;
+            margin: 0; padding: 0;
+            font-family: Verdana, Tahoma, sans-serif;
+        }
+        header, section, footer {
+            display: block;
+            box-sizing: border-box;
+            width: calc(96vw - 20px);
+            min-height: 96vh;
+            padding: 1em;
+            border-radius: 1em;
+            margin: 2vh 2vw;
+            background-image: linear-gradient(to bottom right, lightYellow 20%, darkSeaGreen);
+            box-shadow: 0.2em 0.3em 0.5em 0 black;
+        }
+        ul, ol {
+            padding-left: 3em;
+        }
+        @media (min-height: 40em) {
+            header, section, footer {
+                height: 96vh;
+            } 
+            section > ul, section > ol, footer > ul {
+                height: calc(100% - 5em);
+                overflow: auto;
+            }
+            header ul {
+                height: calc(100% - 10em);
+                overflow: auto;
+            }
+        }
+        @media (min-width: 30em) {
+            :root {
+                font-size: 150%;
+            }
+            li li {
+                font-size: 80%;
+            }
+        }
+        @media (min-width: 40em) AND (min-height: 40em) {
+            :root {
+                font-size: 200%;
+            }
+        }
+        .control {
+            display: block;
+            position: fixed;
+            background-color: rgba(100%, 100%, 75%, 0.5); 
+            font-size: 80%;
+            padding: 0.25em 0.5em;
+            bottom: 0;
+            right: 0;
+            z-index: 1000;
+        }
+        .control input[type="checkbox"] {
+            height: 1em;
+            width: 1em;
+            border-radius: 25%;
+            box-sizing: border-box;
+            font-size: inherit;
+        }
+        :not(a):focus {
+            outline: none;
+            border-right: solid seaGreen;
+        }
+    </style>
+    <style id="interactive-styles" disabled="disabled" media="only none">
+        section :focus ~ li, section :focus ~ ul, section :focus ~ ol, 
+        section .contains-focus ~ li, section .contains-focus ~ ul, section .contains-focus ~ ol {
+            opacity: 0.05;
+        }
+        section li ul, section li ol {
+            height: 0;
+            opacity: 0;
+            overflow: hidden;
+            transition: opacity 0.5s;
+        }
+        li:focus ul, .contains-focus > ul,
+        li:focus ol, .contains-focus > ol {
+            height: auto;
+            opacity: 1;
+        }
+    </style>                
+</head>
+<body>
+    
+    <header>
+        <h1>Making the Most of the SVG DOM</h1>
+        <h2>Workshop</h2>
+        <ul>
+            <li>Amelia Bellamy-Royds</li>
+            <li>The Graphical Web 2015</li>
+            <li>26 September, Pittsburgh</li>
+        </ul>
+    </header>
+    
+    <section>
+        <h2>Today:</h2>
+        <ul>
+            <li>Introductions
+                <ul>
+                    <li>Who are you &amp; how do you SVG?</li>
+                </ul>
+            </li>
+            <li>1.25hr Lesson
+                <ul>
+                    <li>Overview</li>
+                    <li>Cool features to use</li>
+                    <li>Limitations and broken/missing features (in my opinion)</li>
+                </ul>
+            </li>
+            <li>Break</li>
+            <li>Discuss!
+                <ul>
+                    <li>What's missing, in your opinion?</li>
+                    <li>What problems do you want to solve?</li>
+                    <li>What geometry do you need to calculate?</li>
+                    <li>What code structures are most intuitive?</li>
+                </ul>
+            </li>
+        </ul>
+    </section>
+    
+    <section>
+        <h2>SVG DOM</h2>
+        <ul>
+            <li>SVG = Scalable Vector Graphics</li>
+            <li>SVG DOM = Document Object Model</li>
+            <li>SVG DOM = <br/>
+                methods &amp; objects specific to SVG to use in your scripts
+            </li>
+        </ul>
+    </section>
+    
+    <section>
+        <h2>The Document Object Model</h2>
+        <ul>
+            <li>HTML, originally, was text + annotations (markup)</li>
+            <li>"Dynamic" HTML required object-oriented approach</li>
+            <li>Standardized as W3C Core DOM Spec
+                <ul>
+                    <li><a href="http://www.w3.org/TR/2004/REC-DOM-Level-3-Core-20040407/">Level 3</a> was finalized in 2004</li>
+                    <li><a href="http://www.w3.org/TR/domcore/">Level 4</a> is currently "Last Call"</li>
+                </ul>
+            </li>
+            <li>Core DOM supports many XML-style document types</li>
+        </ul>
+    </section>
+    
+    <section>
+        <h2>Core DOM</h2>
+        <ul>
+            <li>Interfaces for markup structure:
+                <ul>
+                    <li>Document</li>
+                    <li>Node</li>
+                    <li>Element</li>
+                    <li>Text</li>
+                    <li>formerly, Attr(ibute)</li>
+                    <li>Event</li>
+                </ul>
+            </li>
+            <li>Object properties to traverse the tree
+                <ul>
+                    <li>parentNode</li>
+                    <li>previousSibling, nextSibling</li>
+                    <li>children, firstChild, lastChild, firstElementChild, lastElementChild</li>
+                    <li>ownerDocument</li>
+                    <li>attributes</li>
+                </ul>
+            </li>
+            <li>Methods to create &amp; manipulate document nodes:
+                <ul>
+                    <li>createElement()</li>
+                    <li>appendChild(), replaceChild(), removeChild(), insertBefore()</li>
+                </ul>
+            </li>
+            <li>Methods to query or change attributes:
+                <ul>
+                    <li>getAttribute(), hasAttribute()</li>
+                    <li>setAttribute(), removeAttribute()</li>
+                </ul>
+            </li>
+            <li><strong>Core DOM methods supported in all browsers for SVG content</strong>, so long as you respect namespaces…</li>
+        </ul>
+    </section>
+    
+    <section>
+        <h2>Nodes and Namespaces</h2>
+        <ul>
+            <li>DOM has supported XML namespaces since DOM Level 2 (~same time as SVG 1)
+            </li>
+            <li>Elements and attributes can be attached to namespace URIs
+                <ul>
+                    <li>createElementNS()</li>
+                    <li>setAttributeNS(), getAttributeNS(), etc.</li>
+                </ul>
+            </li>
+            <li><strong>But</strong> namespace <em>prefixes</em> and <code>xmlns</code> attributes don't have an effect on DOM-created nodes</li>
+            
+        </ul>
+    </section>
+    
+    <section>
+        <h2>HTML DOM</h2>
+        <ul>
+            <li>Methods &amp; objects specific to HTML documents &amp; elements</li>
+            <li>HTML-specific functionality
+                <ul>
+                    <li>HTMLDocument properties for the body element, or to access all images, links, etc without traversing all elements in the tree</li>
+                    <li>HTMLElement properties for global attributes: <code>id</code>, <code>title</code>, <code>lang</code>, <code>dir</code>, <code>className</code> (and later) <code>classList</code></li>
+                    <li>Interfaces for specific element types (e.g., <code>&lt;input></code> elements) with attributes as properties, plus focus/blur/click methods</li>
+                </ul>
+            </li>
+            <li>Backwards-compatible features for "DOM Level 0"
+                <ul>
+                    <li>attributes as properties</li>
+                    <li><code>Document.write()</code> etc. (don't use!)</li>
+                    <li>HTMLCollection vs. NodeList</li>
+                </ul>
+            </li>
+            <li>Now defined as part of HTML 5
+            </li>
+        </ul>
+    </section>
+    
+    <section>
+        <h2>Core/HTML DOM Changes since SVG 1</h2>
+        <ul>
+            <li>Many features have been generalized from HTMLElement/HTMLDocument to core Element/Document 
+                <ul>
+                    <li><code>getElementById()</code> and <code>id</code> property</li>
+                    <li><code>classList</code> and <code>className</code> properties</li>
+                    <li><code>URL</code> property on all Documents</li>
+                </ul>
+            </li>
+            <li><strong>Not all SVG implementations reflect these changes!</strong></li>
+            <li>Some features now apply to all HTMLElement, but not Elements in general 
+                <ul>
+                    <li>focus/blur control</li>
+                    <li>contentEditable</li>
+                </ul>
+            </li>
+            <li>HTML 5 spec <em>extends</em> the DOM spec Document interface vs defining an HTMLDocument interface</li>
+            <li>CSSOM greatly extended
+            </li>
+        </ul>
+    </section>
+    
+    <section>
+        <h2>SVG DOM</h2>
+        <ul>
+            <li>Essential part of SVG 1 and 1.1 spec</li>
+            <li>Extends core DOM</li>
+            <li><a href="http://www.w3.org/TR/SVG11/idl.html">Much more complex than HTML DOM</a>
+                <ul>
+                    <li>Monitor SMIL-based declarative animation</li>
+                    <li>Convert between units</li>
+                    <li>Object-oriented access to complex attributes</li>
+                    <li>Perform geometric calculations</li>
+                </ul>
+            </li>
+            <li>Programming-language neutral
+                <ul>
+                    <li>Does not assume JavaScript</li>
+                    <li>Does not take advantage of JS syntax features</li>
+                </ul>
+            </li>
+            <li><em>Partially</em> implemented in all modern web browsers, a few older SVG viewers</li>
+        </ul>
+    </section>
+    
+    <section>
+        <h2>Monitor SMIL Animations</h2>
+        <ul>
+            <li>As with HTML, important attributes accessible as properties
+                <ul>
+                    <li><code>circle.cx</code></li>
+                    <li><code>group.transform</code></li>
+                </ul>
+            </li>
+            <li>But each attribute could be animated</li>
+            <li>So, each property has two sub-properties
+                <ul>
+                    <li><code>baseVal</code> reflects the attribute</li>
+                    <li><code>animVal</code> is read-only</li>
+                </ul>
+            </li>
+            <li>If value is not animated using SMIL, <code>animVal</code> should equal <code>baseVal</code></li>
+            <li>JS animations change baseVal, not animVal!</li>
+            <li>No equivalent for style properties or CSS animations</li>
+            <li>Some exceptions…
+                <ul>
+                    <li><code>points</code> and <code>animatedPoints</code> not <code>points.animVal</code></li>
+                </ul>
+            </li>
+        </ul>
+    </section>
+    
+    <section>
+        <h2>Convert Between Units</h2>
+        <ul>
+            <li><code>baseVal</code> and <code>animVal</code> are complex objects, too!
+            </li>
+            <li>For lengths or angles, get/set properties as numbers or as strings with units
+                <ul>
+                    <li><code>circle.cx.baseVal.value</code> for value in user units</li>
+                    <li><code>circle.cx.baseVal.valueInSpecifiedUnits</code> for value as a number, but in current units</li>
+                    <li><code>circle.cx.baseVal.valueAsString</code> for value + units</li>
+                    <li><code>circle.cx.baseVal.unitType</code> for unit as an enumerated integer type (not a string!)</li>
+                </ul>
+            </li>
+            <li>Conversion methods
+                <li><code>convertToSpecifiedUnits()</code> to change unit, not value</li>
+                <li><code>newValueSpecifiedUnits()</code> to set unit and value</li>
+            </li>
+            <li>Possible uses:
+                <ul>
+                    <li>Clean-up an imported graphic to use consistent units for animation/calculation</li>
+                    <li>Convert px to em to match font-size adjustments</li>
+                    <li>Convert degrees to radians for JS trig functions</li>
+                </ul>
+            </li>
+            <li><strong>Well implemented in browsers</strong></li>
+            <li>Usually, <em>but not always</em>, changing <code>baseVal.value</code> has less lag than setting attributes
+                <ul>
+                    <li>Testing by Brian Birtles in 2014</li>
+                    <li><a href="http://people.mozilla.org/~bbirtles/pres/graphical-web-2014/#/9">Slides from last year's Graphical Web talk</a></li>
+                </ul>
+            </li>
+            <li>You can create a stand-alone length/angle object</li>
+            <li><em>But</em>, no way to give it context for percentages or font-relative units!</li>
+        </ul>
+    </section>
+    
+    <section>
+        <h2>OO Approach to Complex Attributes</h2>
+        <ul>
+            <li>Path data, polygon points, transformation lists, text positioning attributes</li>
+            <li>Property value is a list of objects
+            </li>
+            <li>Methods to query and manipulate the list
+                <ul>
+                    <li><code>numberOfItems</code> property</li>
+                    <li><code>clear()</code> to empty the list</li>
+                    <li><code>initialize(item)</code> to set it to a single value</li>
+                    <li><code>insertItemBefore(newItem, oldIndex)</code></li>
+                    <li><code>replaceItem(newItem, atIndex)</code></li>
+                    <li><code>removeItem(index)</code></li>
+                    <li><code>appendItem(newItem)</code></li>
+                </ul>
+            </li>
+            <li>No array-like access (<code>points[0]</code>) in SVG 1.1 
+                <ul>
+                    <li>Supported in <em>some</em> browsers (Firefox/Blink)</li>
+                    <li>SVG 2 makes this standard, along with <code>length</code>
+                    as synonym to <code>numberOfItems</code></li>
+                    <li>Would allow you to apply JS array functions to a list</li>
+                </ul>
+            </li>
+            <li>Objects can only be in one list at a time</li>
+            <li>Possible uses:
+                <ul>
+                    <li>Splitting/merging paths</li>
+                    <li>Animating part of a complex attribute without re-generating &amp; parsing the entire string</li>
+                </ul>
+            </li>
+            <li><strong>Implemented but buggy in browsers</strong></li>
+            <li>Setting attributes still most common solution</li>
+        </ul>
+    </section>
+    
+    <section>
+        <h2>Perform geometric calculations</h2>
+        <ul>
+            <li>Measure paths</li>
+            <li>Measure text</li>
+            <li>Measure other objects in two dimensions</li>
+            <li>Convert between transformed coordinate systems</li>
+        </ul>
+    </section>
+    
+    <section>
+        <h2>Measure Paths</h2>
+        <ul>
+            <li><code>path.getTotalLength()</code></li>
+            <li><code>path.getPointAtLength(l)</code></li>
+            <li><code>path.getPathSegAtLength(l)</code>
+                <ul>
+                    <li>Less useful because of bugginess of path segment lists</li>
+                </ul>
+            </li>
+            <li>Possible uses:
+                <ul>
+                    <li>Set up path-drawing stroke dash animations</li>
+                    <li>Position symbols equi-distant along a path</li>
+                    <li>Create motion path animations without SMIL</li>
+                </ul>
+            </li>
+            <li>Limitations
+                <ul>
+                    <li>Only apply to <code>&lt;path></code> element</li>
+                    <li>Path lengths are approximations, not exact</li>
+                    <li>The <code>pathLength</code> attribute should standardize for pathLength differences, but most browsers do not apply it to stroke dashing</li>
+                    <li>No information about gaps in the path</li>
+                    <li>No quick method to get angle of a path at a given point</li>
+                </ul>                
+            </li>
+            <li><strong>Well implemented, but a few versions of Firefox in 2014 gave really, really bad results</strong></li>
+        </ul>
+    </section>
+    
+    <section>
+        <h2>Measure Text</h2>
+        <ul>
+            <li>Many methods for text content elements:
+                <ul>
+                    <li><code>getNumberOfChars()</code></li>
+                    <li><code>getComputedTextLength()</code></li>
+                    <li><code>getSubStringLength(charnum, nchars)</code></li>
+                    <li><code>getStartPositionOfChar(charnum)</code></li>
+                    <li><code>getEndPositionOfChar(charnum)</code></li>
+                    <li><code>getExtentOfChar(charnum)</code></li>
+                    <li><code>getRotationOfChar(charnum)</code></li>
+                    <li><code>getCharNumAtPosition(point)</code></li>
+                </ul>
+            </li>
+            <li>Possible uses:
+                <ul>
+                    <li><a href="http://stackoverflow.com/questions/22736968/is-there-a-way-to-draw-a-rectangle-around-single-letters-on-a-svg-textpath/22749289#22749289">Drawing shapes around individual characters</a></li>
+                    <li>Animating letters into/out of place</li>
+                    <li>Breaking strings into multiple lines with a max width</li>
+                    <li>Determining lengths for <code>textLength</code> adjust</li>
+                </ul>
+            </li>
+            <li>Limitations:
+                <ul>
+                    <li>The definition of "char" isn't emojii-friendly (uses UTF-16 blocks)</li>
+                    <li><code>textLength</code>-adjustment implementations are really inconsistent cross-browser</li>
+                </ul>
+            </li>
+        </ul>
+    </section>
+    
+    <section>
+        <h2>Measure 2D Anything</h2>
+        <ul>
+            <li><code>getBBox()</code> to get the bounding box
+                <ul>
+                    <li>Returns an object with x,y,width,height</li>
+                    <li>Tightest-fitting rectangle in the <em>local</em> coordinate system that contains this element &amp; all its children</li>
+                </ul>
+            </li>
+            <li>Possible uses:
+                <ul>
+                    <li>Overall outline of a text element</li>
+                    <li>Approximate mid-point of a shape</li>
+                    <li>Likely overlapping-content</li>
+                </ul>
+            </li>
+            <li>Limitations:
+                <ul>
+                    <li>Only includes the shape, not the stroke or markers (SVG 2 will allow options)</li>
+                    <li>Can be very large for diagonal objects</li>
+                    <li>Is zero height/width for straight horizontal/vertical lines</li>
+                    <li>Text has unique quirks</li>
+                    <li>No easy way to get bounding box relative to a parent element's coordinate system</li>
+                </ul>
+            </li>
+        </ul>
+    </section>
+    
+    <section>
+        <h2>Transform Coordinates</h2>
+        <ul>
+            <li>Drawn objects have the following methods
+                <ul>
+                    <li><code>getCTM()</code> to get cumulative transformation matrix since the parent SVG</li>
+                    <li><code>getScreenCTM()</code> to get cumulative transformation matrix since the document window</li>
+                    <li><code>getTransformToElement(element)</code> to find the net change in tranformation between any two coordinate systems</li>
+                </ul>
+            </li>
+            <li>Returned matrix objects have methods to modify the transformations or transform a point object (such as those returned by other methods)
+            </li>
+            <li>Possible Uses:
+                <ul>
+                    <li>Drawing connectors between transformed shapes</li>
+                    <li>Converting between mouse/touch coordinates and SVG coordinates</li>
+                    <li>Determining the transformation applied by a viewBox</li>
+                </ul>
+            </li>
+            <li>Limitations:
+                <ul>
+                    <li>Only available on SVG elements, not yet extended to general CSS transforms</li>
+                    <li>Not reliable for getting transformation between SVG elements in different inline SVGs within HTML page</li>
+                    <li>The "screen CTM" is actually the "client CTM" using terminology from mouse events</li>
+                    <li>Some browsers (IE9) messed this up, and values are wrong if the user applies browser zoom</li>
+                </ul>
+            </li>
+        </ul>
+    </section>
+    
+    <section>
+        <h2>Problems with SVG DOM</h2>
+        <ul>
+            <li>Browsers:
+                <ul>
+                    <li>Overly complex, lots of SVG-specific implementation code to write &amp; maintain</li>
+                    <li>Complex objects slow performance</li>
+                    <li>Many properties provide different views of the same data</li>
+                    <li>The object-oriented design may not match actual implementations</li>
+                </ul>
+            </li>
+            <li>Authors:
+                <ul>
+                    <li>Overly complex, lots of SVG-specific methods to learn &amp; remember</li>
+                    <li>Wordy Java-style methods instead of simpler JS-style approaches</li>
+                    <li>Rabbit-hole of nested properties to reach simple values</li>
+                    <li>Buggy and incomplete browser implementations of SVG DOM</li>
+                    <li>Buggy and incomplete porting of core DOM updates to SVG elements</li>
+                    <li>Inconsistent application of HTML DOM features to SVG elements</li>
+                </ul>
+            </li>
+            <li>Spec Writers:
+                <ul>
+                    <li>Attributes vs. presentation attributes treated differently, but we want to make more attributes available in CSS</li>
+                    <li>baseVal/animVal doesn't extend well to other animation types</li>
+                    <li>SVG-specific DOM interfaces to properties now available on all elements</li>
+                    <li>If nobody uses these methods, we can't convince browsers they should keep (or introduce) them!</li>
+                </ul>
+            </li>
+        </ul>
+    </section>
+    
+    
+<!-- Template
+    <section>
+        <h2></h2>
+        <ul>
+            <li>
+            </li>
+        </ul>
+    </section>
+-->
+    
+    <footer>
+        <h2>About Me</h2>
+        <ul>
+            <li>Amelia Bellamy-Royds</li>
+            <li>B.Sc., M.J., SVG Evangelist</li>
+            <li>amelia.bellamy.royds@gmail.com</li>
+            <li><a class="literal" href="https://twitter.com/ameliasbrain">@AmeliasBrain</a></li>
+            <li style="padding-top: 2em">I write Books!</li>
+            <li><a href="http://shop.oreilly.com/product/0636920032335.do"><cite>SVG Essentials, 2nd Edition</cite></a></li>
+            <li><a href="http://shop.oreilly.com/product/0636920043065.do"><cite>SVG Colors, Patterns &amp; Gradients</cite></a></li>
+            <li><a href="http://shop.oreilly.com/product/0636920043072.do"><cite>SVG Text Layout</cite></a></li>
+            <li>Coming in 2016: <cite>Using SVG with CSS3 and HTML5</cite></li>
+        </ul>
+    </footer>
+    <script>
+(function(){
+    var initialized = false;  
+    var interactiveStyles = document.getElementById("interactive-styles");
+    var headingSelector = "h1, h2, h3", 
+        pointsSelector = "section > ul > li, section > ol > li, footer > ul > li";
+    
+    var toggleLabel = document.createElement("label");
+    toggleLabel.setAttribute("class", "control");
+    document.body.id ="body";
+    toggleLabel.setAttribute("aria-controls", "body");
+    toggleLabel.textContent = "Tab to reveal";
+    
+    var toggle = document.createElement("input");
+    toggle.setAttribute("type", "checkbox");
+    toggle.addEventListener("change", toggleTabControl);
+    toggleLabel.insertBefore(toggle, null);
+    
+    document.body.insertBefore(toggleLabel, document.body.firstChild);
+    
+    function addTabIndex(selector) {
+        var points = document.querySelectorAll(selector);
+        for (var i=0, n=points.length; i<n; i++) {
+            points[i].setAttribute("tabIndex", 0);
+        }
+        return points;
+    }
+    function removeTabIndex(selector) {        
+        var points = document.querySelectorAll(selector);
+        for (var i=0, n=points.length; i<n; i++) {
+            points[i].removeAttribute("tabIndex");
+        }
+        return points;
+    }
+    
+    //add tabIndex to headings
+    //scroll slide into place whenever heading gets focus
+    var headings = addTabIndex(headingSelector);
+    for (var i=0, n=headings.length; i<n; i++){
+        headings[i].addEventListener("focus", scrollSlide);
+    }
+    
+    function toggleTabControl(e){
+        
+        if (!e.target.checked){
+            interactiveStyles.setAttribute("disabled", "disabled");
+            interactiveStyles.setAttribute("media", "only none"); 
+                //because "disabled" doesn't work!
+            document.body.insertBefore(interactiveStyles, null); //force refresh
+            
+            //remove tabIndex from points
+            removeTabIndex(pointsSelector);
+            return;
+        }
+        
+        //add tabIndex to bullet points
+        addTabIndex(pointsSelector);
+        
+        if (!initialized) {
+
+            //ensure that focusing links doesn't mess up focus styles
+            var links = document.getElementsByTagName("a");
+            for (var i=0, n=links.length; i<n; i++) {
+                links[i].addEventListener("focus", focusIn);
+                links[i].addEventListener("blur", focusOut);
+            }
+            initialized = true;
+        }
+        
+        interactiveStyles.removeAttribute("disabled");
+        interactiveStyles.setAttribute("media", "screen");
+        document.body.insertBefore(interactiveStyles, null); //force refresh
+    }
+    function focusIn(e){
+        var p = e.target.parentElement;
+        while ((p.tagName.toLowerCase() != "section") && 
+               (p != document.documentElement)) {
+            p.classList.add("contains-focus");
+            p = p.parentElement;
+        }
+    }
+    function focusOut(e){
+        var p = e.target.parentElement;
+        while ((p.tagName.toLowerCase() != "section") && 
+               (p != document.documentElement)) {
+            p.classList.remove("contains-focus");
+            p = p.parentElement;
+        }
+    }
+    function scrollSlide(e){
+        scrollTo(window.scrollX, e.target.parentElement.offsetTop - 10);
+    }
+})();
+    </script>
+</body></html>
